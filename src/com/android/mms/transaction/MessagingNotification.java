@@ -66,6 +66,7 @@ import android.text.style.StyleSpan;
 import android.util.Log;
 import android.widget.RemoteViews;
 import android.widget.Toast;
+import android.graphics.Matrix;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -537,8 +538,15 @@ public class MessagingNotification {
                        iconHeight = (int) (((float) iconWidth / imageWidth) * imageHeight);
                    }
 
-                   Bitmap croppedAvatar = Bitmap.createBitmap(avatarBit, (iconWidth - iconSize) / 2,
-                       (iconHeight - iconSize) / 2, iconSize, iconSize);
+                   // rescale it to the proper dimensions
+                   float scaleWidth = ((float) iconWidth) / imageWidth;
+                   float scaleHeight = ((float) iconHeight) / imageHeight;
+                   // create a matrix for the manipulation
+                   Matrix matrix = new Matrix();
+                   // resize the bit map
+                   matrix.postScale(scaleWidth, scaleHeight);
+                   // recreate the new Bitmap
+                   Bitmap croppedAvatar = Bitmap.createBitmap(avatarBit, 0, 0, imageWidth, imageHeight, matrix, false);
 
                    notificationbuilder.setLargeIcon(croppedAvatar);
                    }
