@@ -45,6 +45,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
+import android.content.res.Resources;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.Typeface;
@@ -139,6 +140,7 @@ public class MessagingNotification {
     };
     private static OnDeletedReceiver sNotificationDeletedReceiver = new OnDeletedReceiver();
     private static Intent sNotificationOnDeleteIntent;
+    private static Drawable sDefaultContactImage;
     private static Handler mToastHandler = new Handler();
 
     private MessagingNotification() {
@@ -156,6 +158,8 @@ public class MessagingNotification {
 
         // initialize the notification deleted action
         sNotificationOnDeleteIntent = new Intent(NOTIFICATION_DELETED_ACTION);
+
+        sDefaultContactImage = context.getResources().getDrawable(R.drawable.ic_contact_picture);
     }
 
     /**
@@ -502,6 +506,24 @@ public class MessagingNotification {
 
         int notificationdefaults = Notification.DEFAULT_LIGHTS;
 
+        // Set the large icon of the notification to be the avatar of the
+        // contact who sent the most recent message. This is consistent with the
+        // Gapps that use notifications like this.
+        Drawable avatarDraw = Contact.get(lastSender, true).getAvatar(context,
+                sDefaultContactImage);
+        Bitmap originalAvatarBit = ((BitmapDrawable)avatarDraw).getBitmap();
+        // The Contact's avatar is unlikely to be the correct size, so scale it
+        // to the notification icon View. This does not deal with differint
+        // aspect ratios between the two, but it shouldn't need to.
+        Resources resources = context.getResources();
+        int iconWidth = resources.getDimensionPixelSize(
+                android.R.dimen.notification_large_icon_width);
+        int iconHeight = resources.getDimensionPixelSize(
+                android.R.dimen.notification_large_icon_height);
+        Bitmap avatarBit = Bitmap.createScaledBitmap(originalAvatarBit, iconWidth, iconHeight,
+                                                     false);
+        notificationbuilder.setLargeIcon(avatarBit);
+
         // If we have more than one unique thread, change the title (which would
         // normally be the contact who sent the message) to a generic one that
         // makes sense for multiple senders, and change the Intent to take the
@@ -515,45 +537,6 @@ public class MessagingNotification {
                     | Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
             clickIntent.setType("vnd.android-dir/mms-sms");
-        } else
-        {
-            // If we're in here, we only have one unique thread so we should show
-            // the picture of the sender if it exists.
-            Drawable avatarDraw = Contact.get(lastSender, true).getAvatar(context, null);
-
-            try {
-                if (avatarDraw != null) {
-                   // Create the large notification icon
-                   Bitmap avatarBit = ((BitmapDrawable)avatarDraw).getBitmap();
-                   int iconSize = context.getResources().getDimensionPixelSize(android.R.dimen.notification_large_icon_height);
-
-                   // Resize it if it's a weird size
-                   int imageWidth = avatarBit.getWidth();
-                   int imageHeight = avatarBit.getHeight();
-                   int iconWidth = iconSize;
-                   int iconHeight = iconSize;
-                   if (imageWidth > imageHeight) {
-                       iconWidth = (int) (((float) iconHeight / imageHeight) * imageWidth);
-                   } else {
-                       iconHeight = (int) (((float) iconWidth / imageWidth) * imageHeight);
-                   }
-
-                   // rescale it to the proper dimensions
-                   float scaleWidth = ((float) iconWidth) / imageWidth;
-                   float scaleHeight = ((float) iconHeight) / imageHeight;
-                   // create a matrix for the manipulation
-                   Matrix matrix = new Matrix();
-                   // resize the bit map
-                   matrix.postScale(scaleWidth, scaleHeight);
-                   // recreate the new Bitmap
-                   Bitmap croppedAvatar = Bitmap.createBitmap(avatarBit, 0, 0, imageWidth, imageHeight, matrix, false);
-
-                   notificationbuilder.setLargeIcon(croppedAvatar);
-                   }
-            } catch (Exception e) {
-                    // Something happened, but we'll just use the original icon
-                    Log.v(TAG, "Failed to set bitmap for contact");
-            }
         }
 
         // If there is more than one message, change the description (which
